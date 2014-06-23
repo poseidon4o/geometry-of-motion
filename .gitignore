@@ -1,3 +1,11 @@
+# Library files
+Buttons/*
+Sources/*
+Textures/*
+
+# Sublime project files
+*.sublime*
+
 # Compiled Object files
 *.slo
 *.lo
