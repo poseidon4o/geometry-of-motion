@@ -1,3 +1,10 @@
+# CodeBlocks files
+bin/
+obj/
+*.dat
+*.depend
+*.layout
+
 # Library files
 Buttons/*
 Sources/*
