@@ -6,18 +6,23 @@ double vlen(vect && v)
     return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
-void attach_beams(Beam & left, Beam & right, bool use_pos = true)
+bool d_eq(double a, double b)
+{
+    return fabs(a - b) < 0.001;
+}
+
+int attach_beams(Beam & left, Beam & right, bool use_pos = true)
 {
     double r1 = left.getSize(), r2 = right.getSize(),
            dist = vlen(left.getCenter() - right.getCenter());
 
     if( (dist > r1 + r2) ||
         (dist < fabs(r1 - r2)) ||
-        ((dist == 0) && (r1 == r2))
+        ((dist == 0) && d_eq(r1, r2))
        ) {
         left.setH(0);
         right.setH(0);
-        return;
+        return 0;
     }
 
     double a = (r1 * r1 - r2 * r2 + dist * dist) / (2 * dist);
@@ -37,11 +42,18 @@ void attach_beams(Beam & left, Beam & right, bool use_pos = true)
         right.setH(atan2(pt2.y - right.getCenter().y, pt2.x - right.getCenter().x) * 180 / M_PI);
     }
 
+    if(d_eq(dist, r1 + r2)) {
+        return 1;
+    } else {
+        return 2;
+    }
 }
 
 class cissoid_cls: public MechoDev {
-    const int mult1 = 2.9, mult2 = 3.5;
-    double size, radius, offset, dir, stop_angle;
+    bool can_flip, inner;
+
+    double long_m, short_m;
+    double size, radius, offset, dir;
     vect center;
     Pencil pen;
 
@@ -51,18 +63,19 @@ class cissoid_cls: public MechoDev {
          control_up, control_down; // long
 
 public:
-    cissoid_cls(double, const vect &);
+    cissoid_cls(const vect &, double = 2.9, double = 5);
     void setTime(double);
 private:
     void fixHeights();
 };
 
-cissoid_cls::cissoid_cls(double size, const vect & center):
-    offset(0), dir(1), stop_angle(55),
-    size(size), pen(size), rotator(size), center(center),
-    pivot_up(size * mult1), pivot_down(size * mult1),
-    drawer_up(size * mult1), drawer_down(size * mult1),
-    control_up(size * mult2), control_down(size * mult2)
+cissoid_cls::cissoid_cls(const vect & center, double short_m, double long_m):
+    offset(180), dir(1), can_flip(false), long_m(long_m), short_m(short_m),
+    inner(long_m / short_m < 2.22), size(short_m), pen(0),
+    center(center), rotator(short_m),
+    pivot_up(short_m), pivot_down(short_m),
+    drawer_up(short_m), drawer_down(short_m),
+    control_up(long_m), control_down(long_m)
 {
     setSpeed(50);
     rotator.setCenter(center);
@@ -76,22 +89,13 @@ cissoid_cls::cissoid_cls(double size, const vect & center):
     drawer_up.setCenter(control_up.otherPoint());
     drawer_down.setCenter(control_down.otherPoint());
 
-    offset = stop_angle;
     setTime(0);
-
     pen.penDown();
-    fixHeights();
 }
 
 
 void cissoid_cls::setTime(double time)
 {
-    if(dir == 1 && offset >= 360 - stop_angle) {
-        dir = -1;
-    } else if(dir == -1 && offset <= stop_angle) {
-        dir = 1;
-    }
-
     offset += dt * getSpeed() * dir;
     rotator.setH(offset);
 
@@ -104,7 +108,21 @@ void cissoid_cls::setTime(double time)
     drawer_up.setCenter(pivot_up.otherPoint());
     drawer_down.setCenter(pivot_down.otherPoint());
 
-    attach_beams(drawer_down, drawer_up, true);
+    int points = attach_beams(drawer_down, drawer_up, !inner);
+    if(!points) {
+        dir *= -1;
+        can_flip = true;
+        return setTime(time);
+    }
+
+    if(fabs(offset - 180) < 5) {
+        can_flip = true;
+    }
+
+    if(points == 1 && can_flip) {
+        can_flip = false;
+        inner = !inner;
+    }
 
     fixHeights();
     pen.setCenter(drawer_up.otherPoint().setZ(0));
@@ -127,7 +145,7 @@ void cissoid_cls::fixHeights()
 int main()
 {
     initMecho("Cissoid", BUTTON_EXIT);
-    cissoid_cls cs(5, {0, 0, 0, 0});
+    cissoid_cls cs({0, 0, 0, 0}, 10, 16);
 
     while(runningMecho()) {
         cs.setTime(t);
