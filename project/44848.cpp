@@ -127,15 +127,18 @@ void cissoid_cls::setTime(double time)
 
     int points = attach_beams(drawer_down, drawer_up, !inner);
     if(!points) {
+        // if beams cant be connected change direction
         dir *= -1;
         can_flip = true;
-        return setTime(time);
+        return setTime(time); // call again to repostion correctly
     }
 
+    // passing trough the center of the cusp sets the flag
     if(fabs(offset - 180) < 5) {
         can_flip = true;
     }
 
+    // the rhombus is a line so we are not in the cusp
     if(points == 1 && can_flip) {
         can_flip = false;
         inner = !inner;
