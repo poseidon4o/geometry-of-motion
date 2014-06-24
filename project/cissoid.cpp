@@ -107,14 +107,14 @@ void cissoid_cls::setTime(double time)
 
 int main()
 {
-	initMecho("Cissoid", BUTTON_EXIT);
+    initMecho("Cissoid", BUTTON_EXIT);
     cissoid_cls cs(5, {0, 0, 0, 0});
 
-	while(runningMecho()) {
+    while(runningMecho()) {
         cs.setTime(t);
-	}
+    }
 
-	finitMecho();
-	return 0;
+    finitMecho();
+    return 0;
 }
 
