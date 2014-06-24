@@ -1,21 +1,35 @@
+/// Любомир Коев, спец. Информатика ф.н. 44848, 24.06.2014
+/// GPL v3.0
+
 #include "Mecho.h"
 #include "Lemniscate.h"
 
+// length of vector
 double vlen(vect && v)
 {
     return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
+// compares two doubles
 bool d_eq(double a, double b)
 {
     return fabs(a - b) < 0.001;
 }
 
+/**
+ * Attach two beams so their 'other' points are connected
+ * last parameter is used to specify at which point should they connect
+ *
+ * @param left - first beam
+ * @param right - second beam
+ * @return number of points that could be used to connect the beams
+ */
 int attach_beams(Beam & left, Beam & right, bool use_pos = true)
 {
     double r1 = left.getSize(), r2 = right.getSize(),
            dist = vlen(left.getCenter() - right.getCenter());
 
+    // check if beams cant connect - too far apart or too close
     if( (dist > r1 + r2) ||
         (dist < fabs(r1 - r2)) ||
         ((dist == 0) && d_eq(r1, r2))
@@ -42,6 +56,7 @@ int attach_beams(Beam & left, Beam & right, bool use_pos = true)
         right.setH(atan2(pt2.y - right.getCenter().y, pt2.x - right.getCenter().x) * 180 / M_PI);
     }
 
+    // if there is only 1 intersection point - only 1 point to touch
     if(d_eq(dist, r1 + r2)) {
         return 1;
     } else {
@@ -50,10 +65,12 @@ int attach_beams(Beam & left, Beam & right, bool use_pos = true)
 }
 
 class cissoid_cls: public MechoDev {
-    bool can_flip, inner;
+    bool can_flip, // used in animation to show if in cusp or not
+         inner; // falg to specify if there is a cusp
 
-    double long_m, short_m;
-    double size, radius, offset, dir;
+    double long_m, short_m; // lengths of 'short' and 'long' beams
+    double size, radius, offset, dir, height;
+
     vect center;
     Pencil pen;
 
@@ -65,13 +82,14 @@ class cissoid_cls: public MechoDev {
 public:
     cissoid_cls(const vect &, double = 2.9, double = 5);
     void setTime(double);
+    vect getCenter() const { return center; }
 private:
-    void fixHeights();
+    void fixHeights(); // fix heights of all parts
 };
 
 cissoid_cls::cissoid_cls(const vect & center, double short_m, double long_m):
     offset(180), dir(1), can_flip(false), long_m(long_m), short_m(short_m),
-    inner(long_m / short_m < 2.22), size(short_m), pen(0),
+    inner(long_m / short_m < 2.22), size(short_m), pen(3), height(3),
     center(center), rotator(short_m),
     pivot_up(short_m), pivot_down(short_m),
     drawer_up(short_m), drawer_down(short_m),
@@ -92,7 +110,6 @@ cissoid_cls::cissoid_cls(const vect & center, double short_m, double long_m):
     setTime(0);
     pen.penDown();
 }
-
 
 void cissoid_cls::setTime(double time)
 {
@@ -124,31 +141,67 @@ void cissoid_cls::setTime(double time)
         inner = !inner;
     }
 
-    fixHeights();
     pen.setCenter(drawer_up.otherPoint().setZ(0));
+    fixHeights();
 }
 
 void cissoid_cls::fixHeights()
 {
-    rotator.setZ(3);
+    rotator.setZ(height + 1.5);
 
-    control_down.setZ(2);
-    control_up.setZ(2);
+    control_down.setZ(height + 1);
+    control_up.setZ(height + 1);
 
-    pivot_down.setZ(1);
-    pivot_up.setZ(1);
+    pivot_down.setZ(height + .5);
+    pivot_up.setZ(height + .5);
 
-    drawer_down.setZ(0);
-    drawer_up.setZ(0);
+    drawer_down.setZ(height);
+    drawer_up.setZ(height);
 }
+
+
+cissoid_cls * cs;
+Button2D * btn_change_short, * btn_change_speed;
+int short_beam = 10, long_beam = 16;
+
+/**
+ * Toggle short beam length
+ */
+void toggle_short()
+{
+    vect center = cs->getCenter();
+    delete cs;
+    static int cycle = 0;
+    cycle = (cycle + 1) % 4;
+    cs = new cissoid_cls(center, short_beam - cycle, long_beam);
+    btn_change_short->setState(cycle);
+}
+
+/**
+ * Toggle speed of animation
+ */
+void toggle_speed()
+{
+    static int cycle = 0;
+    cycle = (cycle + 1) % 4;
+    cs->setSpeed(cs->getSpeed() + 50 * (2 - cycle));
+    btn_change_speed->setState(cycle);
+}
+
+
 
 int main()
 {
     initMecho("Cissoid", BUTTON_EXIT);
-    cissoid_cls cs({0, 0, 0, 0}, 10, 16);
+    viewDistance = 100;
+
+    cs = new cissoid_cls({0, 0, 0, 0}, short_beam, long_beam);
+
+    btn_change_short = new Button2D("toggle", GLFW_KEY_SPACE, toggle_short, 0, 4);
+    btn_change_speed = new Button2D("time", GLFW_KEY_SPACE, toggle_speed, 0, 4);
 
     while(runningMecho()) {
-        cs.setTime(t);
+        cs->setTime(t);
     }
 
     finitMecho();
